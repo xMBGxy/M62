@@ -1,58 +1,136 @@
-<!DOCTYPE html><html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Card Draw Probability Calculator</title>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
-    h1 { text-align: center; }
-    label { display: block; margin: 10px 0 5px; }
-    input { width: 100%; padding: 8px; box-sizing: border-box; }
-    button { margin-top: 15px; padding: 10px 20px; font-size: 16px; }
-    #result { margin-top: 20px; font-weight: bold; }
-  </style>
-</head>
-<body>
-  <h1>Card Draw Probability Calculator</h1>
-  <p>Calculate the probability of drawing at least 1 Card A and at least 1 Card B in a hand from your deck.</p>
-  <form id="calcForm">
-    <label for="deckSize">Deck Size (N):</label>
-    <input type="number" id="deckSize" value="60" min="1" required />
-    <label for="copiesA">Copies of Card A (K₁):</label>
-    <input type="number" id="copiesA" value="4" min="0" required />
-    <label for="copiesB">Copies of Card B (K₂):</label>
-    <input type="number" id="copiesB" value="4" min="0" required />
-    <label for="handSize">Hand Size (n):</label>
-    <input type="number" id="handSize" value="7" min="1" required />
-    <button type="submit">Calculate Probability</button>
-  </form>
-  <div id="result"></div>  <script>
-    // Compute binomial coefficient nCk without overflow using multiplicative formula
-    function nCk(n, k) {
-      if (k < 0 || k > n) return 0;
-      k = Math.min(k, n - k);
-      let result = 1;
-      for (let i = 1; i <= k; i++) {
-        result = result * (n - k + i) / i;
-      }
-      return result;
-    }
+import React, { useState, useEffect, useRef } from 'react'; import { Slider, Switch, Button, Input, Modal, Tooltip, Checkbox } from '@shadcn/ui'; import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartTooltip, Legend, ResponsiveContainer } from 'recharts'; import Joyride from 'react-joyride'; import { saveAs } from 'file-saver'; import { parse } from 'papaparse'; import queryString from 'query-string'; import './App.css'; // include Tailwind and Dubai font
 
-    document.getElementById('calcForm').addEventListener('submit', function(e) {
-      e.preventDefault();
-      const N = parseInt(document.getElementById('deckSize').value, 10);
-      const K1 = parseInt(document.getElementById('copiesA').value, 10);
-      const K2 = parseInt(document.getElementById('copiesB').value, 10);
-      const n = parseInt(document.getElementById('handSize').value, 10);
+// Helper: combinatorial functions function nCk(n, k) { if (k < 0 || k > n) return 0; k = Math.min(k, n - k); let result = 1; for (let i = 1; i <= k; i++) result = result * (n - k + i) / i; return result; }
 
-      const totalComb = nCk(N, n);
-      const p0A = nCk(N - K1, n) / totalComb;
-      const p0B = nCk(N - K2, n) / totalComb;
-      const p0AB = nCk(N - K1 - K2, n) / totalComb;
-      const probability = 1 - p0A - p0B + p0AB;
-      const pct = (probability * 100).toFixed(4);
+export default function CardProbabilityCalculator() { // State variables const [deckSize, setDeckSize] = useState(60); const [copiesA, setCopiesA] = useState(4); const [copiesB, setCopiesB] = useState(4); const [handSize, setHandSize] = useState(7); const [darkMode, setDarkMode] = useState(false); const [chartData, setChartData] = useState([]); const [showFormula, setShowFormula] = useState(false); const [simulate, setSimulate] = useState(false); const [simulationTrials, setSimulationTrials] = useState(10000); const [empirical, setEmpirical] = useState([]); const [deckList, setDeckList] = useState(''); const [savedScenarios, setSavedScenarios] = useState(() => JSON.parse(localStorage.getItem('scenarios') || '[]')); const [scenarioName, setScenarioName] = useState(''); const joyrideRef = useRef(null);
 
-      document.getElementById('result').textContent = `Probability: ${probability.toFixed(6)} (${pct}%)`;
-    });
-  </script>  <!-- To host on GitHub Pages: push this index.html to your repository's root and enable GitHub Pages in Settings --></body>
-</html>
+// Load from URL params on mount useEffect(() => { const params = queryString.parse(window.location.search); if (params.deckSize) setDeckSize(+params.deckSize); if (params.copiesA) setCopiesA(+params.copiesA); if (params.copiesB) setCopiesB(+params.copiesB); if (params.handSize) setHandSize(+params.handSize); }, []);
+
+// Update chart data whenever inputs change useEffect(() => { const data = []; for (let n = 1; n <= handSize; n++) { const total = nCk(deckSize, n); const p0A = nCk(deckSize - copiesA, n) / total; const p0B = nCk(deckSize - copiesB, n) / total; const p0AB = nCk(deckSize - copiesA - copiesB, n) / total; const prob = 1 - p0A - p0B + p0AB; data.push({ hand: n, probability: prob }); } setChartData(data); }, [deckSize, copiesA, copiesB, handSize]);
+
+// Run simulation if requested useEffect(() => { if (!simulate) return; const counts = Array(handSize + 1).fill(0); for (let t = 0; t < simulationTrials; t++) { let deck = Array(copiesA).fill('A').concat(Array(copiesB).fill('B')); deck = deck.concat(Array(deckSize - deck.length).fill('O')); // shuffle for (let i = deck.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [deck[i], deck[j]] = [deck[j], deck[i]]; } const hand = deck.slice(0, handSize); if (hand.includes('A') && hand.includes('B')) counts[handSize]++; } const emp = counts.map((c, i) => ({ hand: i, empirical: c / simulationTrials })); setEmpirical(emp); }, [simulate, simulationTrials]);
+
+// Save scenarios to localStorage useEffect(() => { localStorage.setItem('scenarios', JSON.stringify(savedScenarios)); }, [savedScenarios]);
+
+// Handlers const calculate = () => { const total = nCk(deckSize, handSize); const p0A = nCk(deckSize - copiesA, handSize) / total; const p0B = nCk(deckSize - copiesB, handSize) / total; const p0AB = nCk(deckSize - copiesA - copiesB, handSize) / total; return 1 - p0A - p0B + p0AB; };
+
+const exportChart = () => { const svg = document.querySelector('svg').outerHTML; const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }); saveAs(blob, 'probability_chart.svg'); };
+
+const shareLink = () => { const params = { deckSize, copiesA, copiesB, handSize }; const url = ${window.location.origin}?${queryString.stringify(params)}; prompt('Shareable URL:', url); };
+
+const importDeck = () => { const counts = { A: 0, B: 0 }; parse(deckList, { complete: (res) => { res.data.forEach(line => { if (!line[0]) return; const parts = line[0].split(' '); const num = +parts[0]; const card = parts.slice(1).join(' '); if (card.match(/Card A/i)) counts.A += num; if (card.match(/Card B/i)) counts.B += num; }); setCopiesA(counts.A); setCopiesB(counts.B); }}); };
+
+const saveScenario = () => { setSavedScenarios([...savedScenarios, { name: scenarioName, params: { deckSize, copiesA, copiesB, handSize } }]); setScenarioName(''); };
+
+return ( <div className={min-h-screen p-6 font-dubai ${darkMode ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}}>
+<header className="flex justify-between items-center">
+<h1 className="text-3xl font-bold">MTG Card Co‑Probability Calculator</h1>
+<Switch checked={darkMode} onCheckedChange={setDarkMode}>Dark Mode</Switch>
+</header>
+
+<section className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+    {/* Inputs Panel */}
+    <div className="space-y-4">
+      <Tooltip content="Size of your deck">  
+        <label>Deck Size (N): <strong>{deckSize}</strong></label>
+      </Tooltip>
+      <Slider value={deckSize} min={1} max={100} onValueChange={setDeckSize} />
+
+      <Tooltip content="Copies of Card A in deck">  
+        <label>Copies of A: <strong>{copiesA}</strong></label>
+      </Tooltip>
+      <Slider value={copiesA} min={0} max={deckSize} onValueChange={setCopiesA} />
+
+      <Tooltip content="Copies of Card B in deck">  
+        <label>Copies of B: <strong>{copiesB}</strong></label>
+      </Tooltip>
+      <Slider value={copiesB} min={0} max={deckSize} onValueChange={setCopiesB} />
+
+      <Tooltip content="Number of cards drawn">  
+        <label>Hand Size (n): <strong>{handSize}</strong></label>
+      </Tooltip>
+      <Slider value={handSize} min={1} max={min(deckSize, 15)} onValueChange={setHandSize} />
+
+      <div className="flex space-x-4 mt-4">
+        <Button onClick={shareLink}>Save & Share</Button>
+        <Button onClick={exportChart}>Export Chart</Button>
+      </div>
+
+      <Checkbox checked={showFormula} onCheckedChange={setShowFormula}>Show Formula</Checkbox>
+      <Checkbox checked={simulate} onCheckedChange={setSimulate}>Monte Carlo Simulation</Checkbox>
+      {simulate && (
+        <Input type="number" value={simulationTrials} min={1000} step={1000} onChange={e => setSimulationTrials(+e.target.value)} placeholder="Trials" />
+      )}
+    </div>
+
+    {/* Visualization Panel */}
+    <div className="h-96">
+      <ResponsiveContainer width="100%" height="100%">
+        <ComposedChart data={chartData} margin={{ top: 20, right: 20, bottom: 20, left: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="hand" />
+          <YAxis />
+          <RechartTooltip />
+          <Legend />
+          <Line type="monotone" dataKey="probability" name="Theoretical" stroke="#8884d8" dot={false} />
+          {simulate && <Bar dataKey="empirical" name="Empirical" />}              
+        </ComposedChart>
+      </ResponsiveContainer>
+      {showFormula && (
+        <div className="mt-4 p-4 bg-gray-100 rounded">
+          P \u003d 1 - C(N-K1, n)/C(N,n) - C(N-K2, n)/C(N,n) + C(N-K1-K2,n)/C(N,n)
+        </div>
+      )}
+    </div>
+  </section>
+
+  {/* Deck Import & Scenarios */}
+  <section className="mt-8">
+    <h2 className="text-2xl font-semibold">Deck & Scenarios</h2>
+    <div className="mt-4 flex space-x-4">
+      <textarea className="border p-2 flex-1" rows={3} value={deckList} onChange={e => setDeckList(e.target.value)} placeholder="Paste decklist here..." />
+      <Button onClick={importDeck}>Import</Button>
+    </div>
+
+    <div className="mt-4 flex items-center space-x-2">
+      <Input value={scenarioName} onChange={e => setScenarioName(e.target.value)} placeholder="Scenario name" />
+      <Button onClick={saveScenario}>Save Scenario</Button>
+    </div>
+
+    <ul className="mt-4 space-y-2">
+      {savedScenarios.map((s, i) => (
+        <li key={i}>
+          <Button variant="link" onClick={() => {
+            const { deckSize, copiesA, copiesB, handSize } = s.params;
+            setDeckSize(deckSize); setCopiesA(copiesA); setCopiesB(copiesB); setHandSize(handSize);
+          }}>{s.name}</Button>
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  {/* FAQ & Tour */}
+  <section className="mt-8">
+    <h2 className="text-2xl font-semibold">FAQ</h2>
+    <details className="mt-2">
+      <summary>Why subtract p₀A + p₀B?</summary>
+      <p>This follows from inclusion-exclusion: we subtract probabilities of drawing no A or no B, then add back the double-counted case of drawing neither.</p>
+    </details>
+    {/* Add more FAQs here... */}
+  </section>
+
+  <Joyride
+    ref={joyrideRef}
+    steps={[
+      { target: 'h1', content: 'Welcome to the MTG Co-Probability Calculator!' },
+      { target: 'input[name=deckSize]', content: 'Adjust your deck size here.' },
+      // ... more steps
+    ]}
+    continuous
+    showSkipButton
+  />
+</div>
+
+); }
+
+function min(a, b) { return a < b ? a : b; }
