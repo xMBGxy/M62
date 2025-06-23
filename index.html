@@ -3,390 +3,164 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MTG Co-Probability Calculator</title>
-  <!-- Chart.js CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <title>MTG Multivariate Probability Simulator</title>
   <style>
     body {
       font-family: Arial, sans-serif;
       padding: 20px;
       max-width: 800px;
       margin: auto;
-      line-height: 1.5;
+      line-height: 1.4;
     }
     h1, h2 {
       text-align: center;
     }
-    .section { margin: 30px 0; }
-    .controls {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
+    .controls, .types, .actions {
+      margin: 20px 0;
     }
-    .control-group {
-      display: flex;
-      flex-direction: column;
+    .controls label, .types input {
+      margin-right: 10px;
     }
-    .control-group label {
-      margin-bottom: 5px;
-      font-weight: bold;
-    }
-    .control-group input[type="range"] {
+    table {
       width: 100%;
-    }
-    .control-group input[type="number"] {
-      width: 60px;
-      margin-left: 10px;
-    }
-    .inline {
-      display: flex;
-      align-items: center;
-    }
-    button, select {
+      border-collapse: collapse;
       margin-top: 10px;
-      padding: 8px 12px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+    }
+    button {
+      margin-right: 10px;
+      padding: 6px 12px;
       font-size: 14px;
     }
-    textarea {
-      width: 100%;
-      height: 80px;
-      font-family: monospace;
-    }
-    #formula, #result {
-      text-align: center;
-      margin-top: 10px;
+    #result {
+      margin-top: 20px;
       font-weight: bold;
-    }
-    .scenario-list button {
-      margin: 2px 4px 2px 0;
-      padding: 4px 8px;
-    }
-    details {
-      margin-top: 10px;
+      text-align: center;
     }
   </style>
 </head>
 <body>
-  <h1>MTG Co-Probability Calculator</h1>
-  <p>Compute P(drawing ≥1 A & ≥1 B) in your opening hand as a percentage.</p>
+  <h1>MTG Multivariate Probability Simulator</h1>
 
-  <!-- Presets & Sharing -->
-  <div class="section inline">
-    <select id="presetSelect" title="Load a preset scenario">
-      <option value="">— Preset Scenarios —</option>
-      <option value="40,4,4,7">Default (40,4 A,4 B,7)</option>
-      <option value="40,8,4,7">8×A vs 4×B, 7-card</option>
-      <option value="40,4,8,7">4×A vs 8×B, 7-card</option>
-      <option value="40,4,4,5">4×A vs 4×B, 5-card</option>
-    </select>
-    <button id="shareBtn">Copy Shareable URL</button>
+  <div class="controls">
+    <label>Deck Size (N):
+      <input type="number" id="deckSize" min="1" value="60">
+    </label>
+    <label>Cards Drawn (n):
+      <input type="number" id="handSize" min="1" value="7">
+    </label>
+    <label>Trials:
+      <input type="number" id="trials" min="1000" step="1000" value="10000">
+    </label>
   </div>
 
-  <!-- Controls -->
-  <div class="section controls">
-    <div class="control-group">
-      <label for="deckSize" title="Total cards in your deck">
-        Deck Size (N): <span id="deckSizeVal">40</span>
-      </label>
-      <div class="inline">
-        <input type="range" id="deckSize" min="40" max="100" value="40">
-        <input type="number" id="deckSizeNum" min="40" max="100" value="40">
-      </div>
-    </div>
-    <div class="control-group">
-      <label for="copiesA" title="Copies of Card A in your deck">
-        Copies of A (K₁): <span id="copiesAVal">4</span>
-      </label>
-      <div class="inline">
-        <input type="range" id="copiesA" min="0" max="40" value="4">
-        <input type="number" id="copiesANum" min="0" max="40" value="4">
-      </div>
-    </div>
-    <div class="control-group">
-      <label for="copiesB" title="Copies of Card B in your deck">
-        Copies of B (K₂): <span id="copiesBVal">4</span>
-      </label>
-      <div class="inline">
-        <input type="range" id="copiesB" min="0" max="40" value="4">
-        <input type="number" id="copiesBNum" min="0" max="40" value="4">
-      </div>
-    </div>
-    <div class="control-group">
-      <label for="handSize" title="Number of cards you draw">
-        Cards Drawn (n): <span id="handSizeVal">7</span>
-      </label>
-      <div class="inline">
-        <input type="range" id="handSize" min="1" max="15" value="7">
-        <input type="number" id="handSizeNum" min="1" max="15" value="7">
-      </div>
-    </div>
+  <h2>Card Types & Thresholds</h2>
+  <div class="types">
+    <table id="typesTable">
+      <thead>
+        <tr>
+          <th>Card Name</th>
+          <th>Copies in Deck</th>
+          <th>Min Drawn</th>
+          <th>Remove</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <button id="addTypeBtn">Add Card Type</button>
   </div>
 
-  <!-- Decklist Import -->
-  <div class="section">
-    <h2>Import Decklist</h2>
-    <p>Paste lines like “4 Card A” or “2 Card B” and click Import:</p>
-    <textarea id="decklist" placeholder="e.g.&#10;4 Card A&#10;3 Other Card&#10;4 Card B"></textarea>
-    <button id="importBtn">Import Decklist</button>
+  <div class="actions">
+    <button id="calculateBtn">Calculate Probability</button>
   </div>
 
-  <!-- Toggles -->
-  <div class="section inline">
-    <label><input type="checkbox" id="showFormula"> Show Formula</label>
-    <label style="margin-left:20px"><input type="checkbox" id="simulate"> Monte Carlo Simulation</label>
-    <div id="simControls" style="display:none; margin-left:10px;">
-      <label>Trials: <input type="number" id="trials" value="10000" min="1000" step="1000"></label>
-      <button id="runSim">Run Sim</button>
-    </div>
-  </div>
-
-  <!-- Chart -->
-  <div class="section">
-    <canvas id="probChart" height="200"></canvas>
-    <div id="formula" style="display:none">
-      P = 1 – C(N–K₁,n)/C(N,n) – C(N–K₂,n)/C(N,n) + C(N–K₁–K₂,n)/C(N,n)
-    </div>
-    <div id="result"></div>
-  </div>
-
-  <!-- Save / Load Scenarios -->
-  <div class="section">
-    <h2>My Scenarios</h2>
-    <div class="inline">
-      <input type="text" id="scenarioName" placeholder="Scenario Name">
-      <button id="saveScenario">Save</button>
-    </div>
-    <div class="scenario-list" id="scenarioList"></div>
-  </div>
-
-  <!-- FAQ -->
-  <div class="section">
-    <details>
-      <summary>Why subtract C(N–K₁,n) + C(N–K₂,n)?</summary>
-      <p>By inclusion–exclusion: remove hands missing A or B, then add back those missing both since they were subtracted twice.</p>
-    </details>
-  </div>
+  <div id="result"></div>
 
   <script>
-  // combinatorial
-  function nCk(n,k){
-    if(k<0||k>n) return 0;
-    k = Math.min(k, n-k);
-    let r=1;
-    for(let i=1;i<=k;i++) r = r*(n-k+i)/i;
-    return r;
-  }
+    const typesTableBody = document.querySelector('#typesTable tbody');
+    const deckSizeInput  = document.getElementById('deckSize');
+    const handSizeInput  = document.getElementById('handSize');
+    const trialsInput    = document.getElementById('trials');
+    const addTypeBtn     = document.getElementById('addTypeBtn');
+    const calculateBtn   = document.getElementById('calculateBtn');
+    const resultDiv      = document.getElementById('result');
 
-  // DOM refs
-  const refs = ['deckSize','copiesA','copiesB','handSize']
-    .reduce((o,id)=>{
-      o[id] = document.getElementById(id);
-      o[id+'Num']   = document.getElementById(id+'Num');
-      o[id+'Val']   = document.getElementById(id+'Val');
-      return o;
-    },{});
-  const presetSelect  = document.getElementById('presetSelect');
-  const shareBtn       = document.getElementById('shareBtn');
-  const decklist       = document.getElementById('decklist');
-  const importBtn      = document.getElementById('importBtn');
-  const showFormula    = document.getElementById('showFormula');
-  const formulaBlock   = document.getElementById('formula');
-  const simulateChk    = document.getElementById('simulate');
-  const simControls    = document.getElementById('simControls');
-  const trialsInput    = document.getElementById('trials');
-  const runSimBtn      = document.getElementById('runSim');
-  const resultDiv      = document.getElementById('result');
-  const saveScenario   = document.getElementById('saveScenario');
-  const scenarioName   = document.getElementById('scenarioName');
-  const scenarioList   = document.getElementById('scenarioList');
-
-  // Chart.js setup
-  const ctx = document.getElementById('probChart').getContext('2d');
-  const chart = new Chart(ctx, {
-    type: 'line',
-    data: { labels: [], datasets: [
-      { label: 'Theoretical (%)', data: [], borderColor: 'blue', fill: false },
-      { label: 'Empirical (%)', data: [], borderColor: 'red',  fill: false }
-    ]},
-    options: {
-      responsive: true,
-      scales: {
-        x: { title: { display:true, text:'Cards Drawn' } },
-        y: { title: { display:true, text:'Probability (%)' }, min:0, max:100 }
-      },
-      plugins: {
-        tooltip: {
-          callbacks: {
-            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}%`
-          }
-        }
-      }
-    }
-  });
-
-  // Utility: sync slider & number input
-  function sync(id){
-    const s = refs[id], n = refs[id+'Num'], v = refs[id+'Val'];
-    s.oninput = () => { n.value=s.value; v.textContent=s.value; updateAll(); };
-    n.onchange = () => {
-      let val = Math.max(+n.min, Math.min(+n.max, +n.value));
-      s.value=n.value=val; v.textContent=val; updateAll();
-    };
-  }
-  ['deckSize','copiesA','copiesB','handSize'].forEach(sync);
-
-  // Load URL params
-  (function(){
-    const p = new URLSearchParams(location.search);
-    ['deckSize','copiesA','copiesB','handSize'].forEach(id=>{
-      if(p.has(id)){
-        let v=+p.get(id);
-        refs[id].value = refs[id+'Num'].value = v;
-        refs[id+'Val'].textContent = v;
-      }
-    });
-  })();
-
-  // Preset scenarios
-  presetSelect.onchange = ()=>{
-    if(!presetSelect.value) return;
-    const [N,K1,K2,n] = presetSelect.value.split(',').map(Number);
-    [['deckSize',N],['copiesA',K1],['copiesB',K2],['handSize',n]]
-      .forEach(([id,val])=>{
-        refs[id].value=refs[id+'Num'].value=val;
-        refs[id+'Val'].textContent=val;
-      });
-    updateAll();
-  };
-
-  // Share URL
-  shareBtn.onclick = ()=>{
-    const p = new URL(location);
-    ['deckSize','copiesA','copiesB','handSize'].forEach(id=>{
-      p.searchParams.set(id, refs[id].value);
-    });
-    navigator.clipboard.writeText(p.toString());
-    alert('Copied URL to clipboard!');
-  };
-
-  // Import decklist
-  importBtn.onclick = ()=> {
-    const lines = decklist.value.split('\n');
-    let A=0,B=0;
-    lines.forEach(l=>{
-      const m = l.trim().match(/(\d+)\s+(.+)/);
-      if(m){
-        const num=+m[1], card=m[2];
-        if(/Card A/i.test(card)) A+=num;
-        if(/Card B/i.test(card)) B+=num;
-      }
-    });
-    refs.copiesA.value = refs.copiesANum.value = A;
-    refs.copiesAVal.textContent = A;
-    refs.copiesB.value = refs.copiesBNum.value = B;
-    refs.copiesBVal.textContent = B;
-    updateAll();
-  };
-
-  // Show formula
-  showFormula.onchange = ()=>
-    formulaBlock.style.display = showFormula.checked ? 'block' : 'none';
-
-  // Simulation controls
-  simulateChk.onchange = ()=>{
-    simControls.style.display = simulateChk.checked ? 'inline-block' : 'none';
-    if(!simulateChk.checked){
-      chart.data.datasets[1].data = [];
-      chart.update();
-    }
-  };
-  runSimBtn.onclick = ()=>{
-    const N = +refs.deckSize.value,
-          K1= +refs.copiesA.value,
-          K2= +refs.copiesB.value,
-          n = +refs.handSize.value,
-          trials = +trialsInput.value;
-    let count=0;
-    for(let t=0;t<trials;t++){
-      const deck = Array(K1).fill('A')
-        .concat(Array(K2).fill('B'))
-        .concat(Array(N-K1-K2).fill('O'));
-      for(let i=deck.length-1;i>0;i--){
-        const j=Math.floor(Math.random()*(i+1));
-        [deck[i],deck[j]]=[deck[j],deck[i]];
-      }
-      const hand = deck.slice(0,n);
-      if(hand.includes('A') && hand.includes('B')) count++;
-    }
-    const emp = count/trials;
-    const empPct = parseFloat((emp*100).toFixed(2));
-    chart.data.datasets[1].data = Array(n).fill(empPct);
-    chart.update();
-    resultDiv.textContent = `Empirical Probability: ${empPct}% over ${trials} trials`;
-  };
-
-  // Save / Load scenarios
-  function renderScenarios(){
-    scenarioList.innerHTML = '';
-    const list = JSON.parse(localStorage.getItem('mtgScenarios')||'[]');
-    list.forEach((s,i)=>{
-      const btn = document.createElement('button');
-      btn.textContent = s.name;
-      btn.onclick = ()=>{
-        ['deckSize','copiesA','copiesB','handSize'].forEach((id,j)=>{
-          const v = s.params[j];
-          refs[id].value = refs[id+'Num'].value = v;
-          refs[id+'Val'].textContent = v;
-        });
-        updateAll();
+    // Add a new row for a card type
+    function addTypeRow(name = '', copies = 4, threshold = 1) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="text" class="type-name" value="${name}" placeholder="e.g. Counterspell"></td>
+        <td><input type="number" class="type-copies" min="0" value="${copies}"></td>
+        <td><input type="number" class="type-threshold" min="0" value="${threshold}"></td>
+        <td><button class="remove-btn">×</button></td>
+      `;
+      typesTableBody.appendChild(tr);
+      tr.querySelector('.remove-btn').onclick = () => {
+        typesTableBody.removeChild(tr);
       };
-      scenarioList.appendChild(btn);
-    });
-  }
-  saveScenario.onclick = ()=>{
-    const name = scenarioName.value.trim();
-    if(!name) return alert('Enter a name');
-    const list = JSON.parse(localStorage.getItem('mtgScenarios')||'[]');
-    list.push({
-      name,
-      params: [
-        +refs.deckSize.value,
-        +refs.copiesA.value,
-        +refs.copiesB.value,
-        +refs.handSize.value
-      ]
-    });
-    localStorage.setItem('mtgScenarios', JSON.stringify(list));
-    scenarioName.value = '';
-    renderScenarios();
-  };
-  renderScenarios();
-
-  // Core: recalc & redraw
-  function updateAll(){
-    const N = +refs.deckSize.value,
-          K1= +refs.copiesA.value,
-          K2= +refs.copiesB.value,
-          n = +refs.handSize.value;
-    const theo = [];
-    for(let i=1;i<=n;i++){
-      const tot = nCk(N,i),
-            p0A = nCk(N-K1,i)/tot,
-            p0B = nCk(N-K2,i)/tot,
-            p0AB= nCk(N-K1-K2,i)/tot;
-      theo.push(parseFloat(((1-p0A-p0B+p0AB)*100).toFixed(2)));
     }
-    chart.data.labels = Array.from({length:n},(_,i)=>i+1);
-    chart.data.datasets[0].data = theo;
-    if(!simulateChk.checked){
-      chart.data.datasets[1].data = [];
-      resultDiv.textContent = `Probability: ${theo[n-1]}%`;
-    }
-    chart.update();
-  }
 
-  // initial draw
-  updateAll();
+    // Fisher–Yates shuffle
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+    }
+
+    // Run Monte Carlo simulation
+    function simulate() {
+      const N      = parseInt(deckSizeInput.value, 10);
+      const n      = parseInt(handSizeInput.value, 10);
+      const trials = parseInt(trialsInput.value,  10);
+
+      // Gather types
+      const rows = Array.from(typesTableBody.querySelectorAll('tr'));
+      const types = rows.map(row => {
+        return {
+          name:      row.querySelector('.type-name').value.trim() || 'Type',
+          copies:    parseInt(row.querySelector('.type-copies').value, 10),
+          threshold: parseInt(row.querySelector('.type-threshold').value, 10)
+        };
+      });
+
+      // Build deck template: indices for each type, plus 'O' for others
+      let deckTemplate = [];
+      types.forEach((t, idx) => {
+        for (let i = 0; i < t.copies; i++) deckTemplate.push(idx);
+      });
+      const others = N - deckTemplate.length;
+      for (let i = 0; i < others; i++) deckTemplate.push('O');
+
+      let success = 0;
+      for (let t = 0; t < trials; t++) {
+        const deck = deckTemplate.slice();
+        shuffle(deck);
+        const hand = deck.slice(0, n);
+        // Count drawn per type
+        const counts = types.map((_, idx) =>
+          hand.filter(c => c === idx).length
+        );
+        // Check all thresholds
+        const ok = counts.every((cnt, i) => cnt >= types[i].threshold);
+        if (ok) success++;
+      }
+
+      const prob = (success / trials * 100).toFixed(2);
+      resultDiv.textContent =
+        `Estimated probability: ${prob}% (over ${trials} trials)`;
+    }
+
+    // Initialize with two default types
+    addTypeRow('Card A', 4, 1);
+    addTypeRow('Card B', 4, 1);
+
+    addTypeBtn.addEventListener('click', () => addTypeRow());
+    calculateBtn.addEventListener('click', simulate);
   </script>
 </body>
 </html>
