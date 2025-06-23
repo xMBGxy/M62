@@ -68,16 +68,16 @@
 </head>
 <body>
   <h1>MTG Co-Probability Calculator</h1>
-  <p>Compute P(drawing ≥1 A & ≥1 B) in your opening hand, and see how it evolves as hand size changes.</p>
+  <p>Compute P(drawing ≥1 A & ≥1 B) in your opening hand as a percentage.</p>
 
   <!-- Presets & Sharing -->
   <div class="section inline">
     <select id="presetSelect" title="Load a preset scenario">
       <option value="">— Preset Scenarios —</option>
-      <option value="60,4,4,7">Default (60,4 A,4 B,7)</option>
-      <option value="60,8,4,7">8×A vs 4×B, 7-card</option>
-      <option value="60,4,8,7">4×A vs 8×B, 7-card</option>
-      <option value="60,4,4,5">4×A vs 4×B, 5-card</option>
+      <option value="40,4,4,7">Default (40,4 A,4 B,7)</option>
+      <option value="40,8,4,7">8×A vs 4×B, 7-card</option>
+      <option value="40,4,8,7">4×A vs 8×B, 7-card</option>
+      <option value="40,4,4,5">4×A vs 4×B, 5-card</option>
     </select>
     <button id="shareBtn">Copy Shareable URL</button>
   </div>
@@ -85,28 +85,36 @@
   <!-- Controls -->
   <div class="section controls">
     <div class="control-group">
-      <label for="deckSize" title="Total cards in your deck">Deck Size (N): <span id="deckSizeVal">60</span></label>
+      <label for="deckSize" title="Total cards in your deck">
+        Deck Size (N): <span id="deckSizeVal">40</span>
+      </label>
       <div class="inline">
-        <input type="range" id="deckSize" min="40" max="100" value="60">
-        <input type="number" id="deckSizeNum" min="40" max="100" value="60">
+        <input type="range" id="deckSize" min="40" max="100" value="40">
+        <input type="number" id="deckSizeNum" min="40" max="100" value="40">
       </div>
     </div>
     <div class="control-group">
-      <label for="copiesA" title="Number of copies of Card A in your deck">Copies of A (K₁): <span id="copiesAVal">4</span></label>
+      <label for="copiesA" title="Copies of Card A in your deck">
+        Copies of A (K₁): <span id="copiesAVal">4</span>
+      </label>
       <div class="inline">
-        <input type="range" id="copiesA" min="0" max="60" value="4">
-        <input type="number" id="copiesANum" min="0" max="60" value="4">
+        <input type="range" id="copiesA" min="0" max="40" value="4">
+        <input type="number" id="copiesANum" min="0" max="40" value="4">
       </div>
     </div>
     <div class="control-group">
-      <label for="copiesB" title="Number of copies of Card B in your deck">Copies of B (K₂): <span id="copiesBVal">4</span></label>
+      <label for="copiesB" title="Copies of Card B in your deck">
+        Copies of B (K₂): <span id="copiesBVal">4</span>
+      </label>
       <div class="inline">
-        <input type="range" id="copiesB" min="0" max="60" value="4">
-        <input type="number" id="copiesBNum" min="0" max="60" value="4">
+        <input type="range" id="copiesB" min="0" max="40" value="4">
+        <input type="number" id="copiesBNum" min="0" max="40" value="4">
       </div>
     </div>
     <div class="control-group">
-      <label for="handSize" title="Number of cards you draw">Hand Size (n): <span id="handSizeVal">7</span></label>
+      <label for="handSize" title="Number of cards you draw">
+        Cards Drawn (n): <span id="handSizeVal">7</span>
+      </label>
       <div class="inline">
         <input type="range" id="handSize" min="1" max="15" value="7">
         <input type="number" id="handSizeNum" min="1" max="15" value="7">
@@ -155,7 +163,7 @@
   <div class="section">
     <details>
       <summary>Why subtract C(N–K₁,n) + C(N–K₂,n)?</summary>
-      <p>By inclusion–exclusion: we remove hands missing A or B, then add back those missing both since they were subtracted twice.</p>
+      <p>By inclusion–exclusion: remove hands missing A or B, then add back those missing both since they were subtracted twice.</p>
     </details>
   </div>
 
@@ -173,52 +181,62 @@
   const refs = ['deckSize','copiesA','copiesB','handSize']
     .reduce((o,id)=>{
       o[id] = document.getElementById(id);
-      o[id+'Num'] = document.getElementById(id+'Num');
-      o[id+'Val'] = document.getElementById(id+'Val');
+      o[id+'Num']   = document.getElementById(id+'Num');
+      o[id+'Val']   = document.getElementById(id+'Val');
       return o;
     },{});
-  const presetSelect = document.getElementById('presetSelect');
-  const shareBtn      = document.getElementById('shareBtn');
-  const decklist      = document.getElementById('decklist');
-  const importBtn     = document.getElementById('importBtn');
-  const showFormula   = document.getElementById('showFormula');
-  const formulaBlock  = document.getElementById('formula');
-  const simulateChk   = document.getElementById('simulate');
-  const simControls   = document.getElementById('simControls');
-  const trialsInput   = document.getElementById('trials');
-  const runSimBtn     = document.getElementById('runSim');
-  const resultDiv     = document.getElementById('result');
-  const saveScenario  = document.getElementById('saveScenario');
-  const scenarioName  = document.getElementById('scenarioName');
-  const scenarioList  = document.getElementById('scenarioList');
+  const presetSelect  = document.getElementById('presetSelect');
+  const shareBtn       = document.getElementById('shareBtn');
+  const decklist       = document.getElementById('decklist');
+  const importBtn      = document.getElementById('importBtn');
+  const showFormula    = document.getElementById('showFormula');
+  const formulaBlock   = document.getElementById('formula');
+  const simulateChk    = document.getElementById('simulate');
+  const simControls    = document.getElementById('simControls');
+  const trialsInput    = document.getElementById('trials');
+  const runSimBtn      = document.getElementById('runSim');
+  const resultDiv      = document.getElementById('result');
+  const saveScenario   = document.getElementById('saveScenario');
+  const scenarioName   = document.getElementById('scenarioName');
+  const scenarioList   = document.getElementById('scenarioList');
 
   // Chart.js setup
   const ctx = document.getElementById('probChart').getContext('2d');
   const chart = new Chart(ctx, {
     type: 'line',
     data: { labels: [], datasets: [
-      { label: 'Theoretical', data: [], borderColor: 'blue', fill: false },
-      { label: 'Empirical', data: [], borderColor: 'red', fill: false }
+      { label: 'Theoretical (%)', data: [], borderColor: 'blue', fill: false },
+      { label: 'Empirical (%)', data: [], borderColor: 'red',  fill: false }
     ]},
     options: {
       responsive: true,
-      scales: { x: { title: { display:true, text:'Hand Size' } }, y: { title: { display:true, text:'Probability' }, min:0, max:1 } }
+      scales: {
+        x: { title: { display:true, text:'Cards Drawn' } },
+        y: { title: { display:true, text:'Probability (%)' }, min:0, max:100 }
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}%`
+          }
+        }
+      }
     }
   });
 
   // Utility: sync slider & number input
   function sync(id){
     const s = refs[id], n = refs[id+'Num'], v = refs[id+'Val'];
-    s.oninput = () => { n.value = s.value; v.textContent=s.value; updateAll(); };
+    s.oninput = () => { n.value=s.value; v.textContent=s.value; updateAll(); };
     n.onchange = () => {
       let val = Math.max(+n.min, Math.min(+n.max, +n.value));
-      s.value = n.value = val; v.textContent=val; updateAll();
+      s.value=n.value=val; v.textContent=val; updateAll();
     };
   }
   ['deckSize','copiesA','copiesB','handSize'].forEach(sync);
 
-  // Read URL params
-  function loadFromURL(){
+  // Load URL params
+  (function(){
     const p = new URLSearchParams(location.search);
     ['deckSize','copiesA','copiesB','handSize'].forEach(id=>{
       if(p.has(id)){
@@ -227,17 +245,17 @@
         refs[id+'Val'].textContent = v;
       }
     });
-  }
-  loadFromURL();
+  })();
 
   // Preset scenarios
   presetSelect.onchange = ()=>{
     if(!presetSelect.value) return;
     const [N,K1,K2,n] = presetSelect.value.split(',').map(Number);
-    ['deckSize','copiesA','copiesB','handSize'].forEach((id,i)=>{
-      refs[id].value = refs[id+'Num'].value = [N,K1,K2,n][i];
-      refs[id+'Val'].textContent = [N,K1,K2,n][i];
-    });
+    [['deckSize',N],['copiesA',K1],['copiesB',K2],['handSize',n]]
+      .forEach(([id,val])=>{
+        refs[id].value=refs[id+'Num'].value=val;
+        refs[id+'Val'].textContent=val;
+      });
     updateAll();
   };
 
@@ -253,10 +271,10 @@
 
   // Import decklist
   importBtn.onclick = ()=> {
-    const lines = decklist.value.split('\\n');
+    const lines = decklist.value.split('\n');
     let A=0,B=0;
     lines.forEach(l=>{
-      const m = l.trim().match(/(\\d+)\\s+(.+)/);
+      const m = l.trim().match(/(\d+)\s+(.+)/);
       if(m){
         const num=+m[1], card=m[2];
         if(/Card A/i.test(card)) A+=num;
@@ -288,25 +306,23 @@
           K2= +refs.copiesB.value,
           n = +refs.handSize.value,
           trials = +trialsInput.value;
-    // Monte Carlo
     let count=0;
     for(let t=0;t<trials;t++){
       const deck = Array(K1).fill('A')
         .concat(Array(K2).fill('B'))
         .concat(Array(N-K1-K2).fill('O'));
-      // shuffle
       for(let i=deck.length-1;i>0;i--){
         const j=Math.floor(Math.random()*(i+1));
         [deck[i],deck[j]]=[deck[j],deck[i]];
       }
-      const hand=deck.slice(0,n);
-      if(hand.includes('A')&&hand.includes('B')) count++;
+      const hand = deck.slice(0,n);
+      if(hand.includes('A') && hand.includes('B')) count++;
     }
     const emp = count/trials;
-    chart.data.datasets[1].data = Array.from({length:n},()=>emp);
+    const empPct = parseFloat((emp*100).toFixed(2));
+    chart.data.datasets[1].data = Array(n).fill(empPct);
     chart.update();
-    resultDiv.textContent = 
-      `Empirical P(A&B) ≈ ${emp.toFixed(4)} over ${trials} trials`;
+    resultDiv.textContent = `Empirical Probability: ${empPct}% over ${trials} trials`;
   };
 
   // Save / Load scenarios
@@ -318,8 +334,9 @@
       btn.textContent = s.name;
       btn.onclick = ()=>{
         ['deckSize','copiesA','copiesB','handSize'].forEach((id,j)=>{
-          refs[id].value = refs[id+'Num'].value = s.params[j];
-          refs[id+'Val'].textContent = s.params[j];
+          const v = s.params[j];
+          refs[id].value = refs[id+'Num'].value = v;
+          refs[id+'Val'].textContent = v;
         });
         updateAll();
       };
@@ -351,21 +368,19 @@
           K1= +refs.copiesA.value,
           K2= +refs.copiesB.value,
           n = +refs.handSize.value;
-    // theoretical
     const theo = [];
     for(let i=1;i<=n;i++){
-      const tot = nCk(N,i);
-      const p0A = nCk(N-K1,i)/tot;
-      const p0B = nCk(N-K2,i)/tot;
-      const p0AB= nCk(N-K1-K2,i)/tot;
-      theo.push( +(1-p0A-p0B+p0AB).toFixed(4) );
+      const tot = nCk(N,i),
+            p0A = nCk(N-K1,i)/tot,
+            p0B = nCk(N-K2,i)/tot,
+            p0AB= nCk(N-K1-K2,i)/tot;
+      theo.push(parseFloat(((1-p0A-p0B+p0AB)*100).toFixed(2)));
     }
     chart.data.labels = Array.from({length:n},(_,i)=>i+1);
     chart.data.datasets[0].data = theo;
     if(!simulateChk.checked){
       chart.data.datasets[1].data = [];
-      resultDiv.textContent = 
-        `P(A & B) = ${theo[n-1].toFixed(4)} for hand size ${n}`;
+      resultDiv.textContent = `Probability: ${theo[n-1]}%`;
     }
     chart.update();
   }
