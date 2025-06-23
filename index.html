@@ -1,46 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>MTG Multivariate Probability Simulator</title>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
-      max-width: 800px;
-      margin: auto;
-      line-height: 1.4;
-    }
-    h1, h2 {
-      text-align: center;
-    }
-    .controls, .types, .actions {
-      margin: 20px 0;
-    }
-    .controls label, .types input {
-      margin-right: 10px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 10px;
-    }
-    th, td {
-      border: 1px solid #ccc;
-      padding: 8px;
-      text-align: center;
-    }
-    button {
-      margin-right: 10px;
-      padding: 6px 12px;
-      font-size: 14px;
-    }
-    #result {
-      margin-top: 20px;
-      font-weight: bold;
-      text-align: center;
-    }
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: auto; line-height: 1.4; }
+    h1, h2 { text-align: center; }
+    .controls, .types, .actions { margin: 20px 0; }
+    .controls label, .types input { margin-right: 10px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    button { margin-right: 10px; padding: 6px 12px; font-size: 14px; }
+    #formula, #result { margin-top: 20px; font-weight: bold; text-align: center; }
+    #formula { display: none; font-size: 0.9em; }
   </style>
 </head>
 <body>
@@ -48,7 +23,7 @@
 
   <div class="controls">
     <label>Deck Size (N):
-      <input type="number" id="deckSize" min="1" value="60">
+      <input type="number" id="deckSize" min="1" value="40">
     </label>
     <label>Cards Drawn (n):
       <input type="number" id="handSize" min="1" value="7">
@@ -62,12 +37,7 @@
   <div class="types">
     <table id="typesTable">
       <thead>
-        <tr>
-          <th>Card Name</th>
-          <th>Copies in Deck</th>
-          <th>Min Drawn</th>
-          <th>Remove</th>
-        </tr>
+        <tr><th>Name</th><th>Copies</th><th>Min Drawn</th><th>Remove</th></tr>
       </thead>
       <tbody></tbody>
     </table>
@@ -75,92 +45,171 @@
   </div>
 
   <div class="actions">
-    <button id="calculateBtn">Calculate Probability</button>
+    <label><input type="checkbox" id="showFormula"> Show Formula</label>
+    <label style="margin-left:20px"><input type="checkbox" id="simulate"> Monte Carlo</label>
+    <button id="calculateBtn">Calculate</button>
   </div>
 
+  <canvas id="probChart" height="200"></canvas>
+  <div id="formula">
+    P = Σ<sub>k₁≥t₁,…,kₘ≥tₘ; Σkᵢ≤n</sub> [∏<sub>i</sub> C(Kᵢ,kᵢ) · C(N–ΣKᵢ, n–Σkᵢ)] ÷ C(N,n)
+  </div>
   <div id="result"></div>
 
   <script>
-    const typesTableBody = document.querySelector('#typesTable tbody');
-    const deckSizeInput  = document.getElementById('deckSize');
-    const handSizeInput  = document.getElementById('handSize');
-    const trialsInput    = document.getElementById('trials');
-    const addTypeBtn     = document.getElementById('addTypeBtn');
-    const calculateBtn   = document.getElementById('calculateBtn');
-    const resultDiv      = document.getElementById('result');
-
-    // Add a new row for a card type
-    function addTypeRow(name = '', copies = 4, threshold = 1) {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td><input type="text" class="type-name" value="${name}" placeholder="e.g. Counterspell"></td>
-        <td><input type="number" class="type-copies" min="0" value="${copies}"></td>
-        <td><input type="number" class="type-threshold" min="0" value="${threshold}"></td>
-        <td><button class="remove-btn">×</button></td>
-      `;
-      typesTableBody.appendChild(tr);
-      tr.querySelector('.remove-btn').onclick = () => {
-        typesTableBody.removeChild(tr);
-      };
+    // nCk helper
+    function nCk(n,k){
+      if(k<0||k>n) return 0;
+      k = Math.min(k, n-k);
+      let r=1;
+      for(let i=1;i<=k;i++) r = r*(n-k+i)/i;
+      return r;
     }
 
     // Fisher–Yates shuffle
-    function shuffle(array) {
-      for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
+    function shuffle(a){
+      for(let i=a.length-1;i>0;i--){
+        const j=Math.floor(Math.random()*(i+1));
+        [a[i],a[j]]=[a[j],a[i]];
       }
     }
 
-    // Run Monte Carlo simulation
-    function simulate() {
-      const N      = parseInt(deckSizeInput.value, 10);
-      const n      = parseInt(handSizeInput.value, 10);
-      const trials = parseInt(trialsInput.value,  10);
+    // DOM refs
+    const deckSizeIn = document.getElementById('deckSize');
+    const handSizeIn = document.getElementById('handSize');
+    const trialsIn   = document.getElementById('trials');
+    const typesTbody = document.querySelector('#typesTable tbody');
+    const addTypeBtn = document.getElementById('addTypeBtn');
+    const calcBtn    = document.getElementById('calculateBtn');
+    const showForm   = document.getElementById('showFormula');
+    const formulaDiv = document.getElementById('formula');
+    const simulateCh = document.getElementById('simulate');
+    const resultDiv  = document.getElementById('result');
 
-      // Gather types
-      const rows = Array.from(typesTableBody.querySelectorAll('tr'));
-      const types = rows.map(row => {
-        return {
-          name:      row.querySelector('.type-name').value.trim() || 'Type',
-          copies:    parseInt(row.querySelector('.type-copies').value, 10),
-          threshold: parseInt(row.querySelector('.type-threshold').value, 10)
-        };
+    // Chart.js setup
+    const ctx = document.getElementById('probChart').getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: { labels: [], datasets: [
+        { label: 'Theoretical (%)', data: [], borderColor: 'blue', fill: false },
+        { label: 'Empirical (%)',  data: [], borderColor: 'red',  fill: false }
+      ]},
+      options: {
+        responsive: true,
+        scales: {
+          x: { title: { display:true, text:'Cards Drawn' } },
+          y: { title: { display:true, text:'Probability (%)' }, min:0, max:100 }
+        },
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}%`
+            }
+          }
+        }
+      }
+    });
+
+    // Add card type row
+    function addType(name='', copies=4, threshold=1){
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input class="type-name" value="${name}" placeholder="Name"></td>
+        <td><input type="number" class="type-copies" min="0" value="${copies}"></td>
+        <td><input type="number" class="type-threshold" min="0" value="${threshold}"></td>
+        <td><button class="rm">×</button></td>`;
+      typesTbody.appendChild(tr);
+      tr.querySelector('.rm').onclick = ()=> tr.remove();
+    }
+
+    // Read types from table
+    function getTypes(){
+      return Array.from(typesTbody.rows).map(r=>({
+        name: r.querySelector('.type-name').value||'',
+        copies: parseInt(r.querySelector('.type-copies').value,10),
+        thr:   parseInt(r.querySelector('.type-threshold').value,10)
+      }));
+    }
+
+    // Compute theoretical P for given nDraw
+    function theoretical(types, N, nDraw){
+      const copies = types.map(t=>t.copies);
+      const thr    = types.map(t=>t.thr);
+      const sumCopies = copies.reduce((a,b)=>a+b,0);
+      const others = N - sumCopies;
+      let sumWays = 0;
+      // recursive enumeration
+      function rec(i, rem, ways){
+        if(i===copies.length){
+          if(rem<0||rem>others) return;
+          sumWays += ways * nCk(others, rem);
+          return;
+        }
+        const Ki = copies[i], ti = thr[i];
+        const maxKi = Math.min(Ki, rem);
+        for(let draw=ti; draw<=maxKi; draw++){
+          rec(i+1, rem-draw, ways * nCk(Ki,draw));
+        }
+      }
+      rec(0, nDraw, 1);
+      return sumWays / nCk(N,nDraw);
+    }
+
+    // Update chart & result
+    function update(){
+      const N = +deckSizeIn.value;
+      const n = +handSizeIn.value;
+      const types = getTypes();
+      // theoretical curve
+      const theo = [];
+      for(let i=1;i<=n;i++){
+        theo.push(+(theoretical(types,N,i)*100).toFixed(2));
+      }
+      chart.data.labels = Array.from({length:n},(_,i)=>i+1);
+      chart.data.datasets[0].data = theo;
+      // clear empirical if not simulating
+      if(!simulateCh.checked) chart.data.datasets[1].data = [];
+      chart.update();
+      resultDiv.textContent = `P(theoretical at n=${n}): ${theo[n-1]}%`;
+    }
+
+    // Run Monte Carlo
+    function simulate(){
+      const N = +deckSizeIn.value;
+      const n = +handSizeIn.value;
+      const T = +trialsIn.value;
+      const types = getTypes();
+      // deck template
+      let template = [];
+      types.forEach((t,i)=>{
+        for(let j=0;j<t.copies;j++) template.push(i);
       });
-
-      // Build deck template: indices for each type, plus 'O' for others
-      let deckTemplate = [];
-      types.forEach((t, idx) => {
-        for (let i = 0; i < t.copies; i++) deckTemplate.push(idx);
-      });
-      const others = N - deckTemplate.length;
-      for (let i = 0; i < others; i++) deckTemplate.push('O');
-
-      let success = 0;
-      for (let t = 0; t < trials; t++) {
-        const deck = deckTemplate.slice();
+      const others = N - template.length;
+      for(let j=0;j<others;j++) template.push('O');
+      let succ=0;
+      for(let t=0;t<T;t++){
+        const deck = template.slice();
         shuffle(deck);
-        const hand = deck.slice(0, n);
-        // Count drawn per type
-        const counts = types.map((_, idx) =>
-          hand.filter(c => c === idx).length
-        );
-        // Check all thresholds
-        const ok = counts.every((cnt, i) => cnt >= types[i].threshold);
-        if (ok) success++;
+        const hand = deck.slice(0,n);
+        // count each type
+        const counts = types.map((_,i)=> hand.filter(x=>x===i).length );
+        if(counts.every((c,i)=> c>=types[i].thr)) succ++;
       }
-
-      const prob = (success / trials * 100).toFixed(2);
-      resultDiv.textContent =
-        `Estimated probability: ${prob}% (over ${trials} trials)`;
+      const emp = +(succ/T*100).toFixed(2);
+      chart.data.datasets[1].data = Array(n).fill(emp);
+      chart.update();
+      resultDiv.textContent += ` │ Empirical: ${emp}%`;
     }
 
-    // Initialize with two default types
-    addTypeRow('Card A', 4, 1);
-    addTypeRow('Card B', 4, 1);
-
-    addTypeBtn.addEventListener('click', () => addTypeRow());
-    calculateBtn.addEventListener('click', simulate);
+    // Event bindings
+    addType('Card A',4,1);
+    addType('Card B',4,1);
+    document.getElementById('addTypeBtn').onclick = ()=> addType();
+    document.getElementById('calculateBtn').onclick = ()=>{
+      update();
+      if(simulateCh.checked) simulate();
+    };
+    showForm.onchange = ()=> formulaDiv.style.display = showForm.checked ? 'block':'none';
   </script>
 </body>
 </html>
